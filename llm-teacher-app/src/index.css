@@ -356,7 +356,7 @@ textarea:focus-visible {
   padding: 8px 0;
 }
 
-.conversation-item {
+.chat-item {
   padding: 8px 12px;
   margin: 0 8px;
   border-radius: 6px;
@@ -368,15 +368,15 @@ textarea:focus-visible {
   font-size: 14px;
 }
 
-.conversation-item:hover {
+.chat-item:hover {
   background-color: #f5f5f5;
 }
 
-.conversation-item.active {
+.chat-item.active {
   background-color: #f0f0f0;
 }
 
-.conversation-item .title {
+.chat-item .title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

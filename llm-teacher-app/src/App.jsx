@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, FileText, Image, ChevronDown, MessageSquare, Trash2, Download, AlertTriangle, Bot, File, Plus, Edit3, MoreHorizontal } from 'lucide-react';
+import { Send, Upload, FileText, Image, ChevronDown, MessageSquare, Trash2, Download, AlertTriangle, Bot, File, Plus, MoreHorizontal } from 'lucide-react';
 
 const LLMTeacherAssistant = () => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [selectedModel, setSelectedModel] = useState('qwen-vision');
+  const [selectedModel, setSelectedModel] = useState('qwen2.5vl:3b');
   const [isLoading, setIsLoading] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
@@ -15,10 +15,8 @@ const LLMTeacherAssistant = () => {
   const fileInputRef = useRef(null);
 
   const models = [
-    { id: 'qwen-vision', name: 'Qwen Vision', description: 'Best for image analysis and vision tasks' },
-    { id: 'qwen-chat', name: 'Qwen Chat', description: 'General conversation and reasoning' },
-    { id: 'llama3', name: 'Llama 3', description: 'Advanced reasoning and text generation' },
-    { id: 'mistral', name: 'Mistral', description: 'Efficient and fast responses' }
+    { id: 'qwen2.5vl:3b', name: 'Qwen 2.5 VL 3B', description: 'Vision-Language model for images and text' },
+    { id: 'qwen2.5vl:7b', name: 'Qwen 2.5 VL 7B', description: 'More Advanced Vision-Language model for images and text' }
   ];
 
   const scrollToBottom = () => {
@@ -34,45 +32,43 @@ const LLMTeacherAssistant = () => {
   }, []);
 
   const loadConversations = async () => {
+    // Use local storage for conversations since Ollama doesn't have this endpoint
     try {
-      const response = await fetch('/api/conversations', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        setConversations(Array.isArray(data) ? data : []);
+      const stored = localStorage.getItem('llm-conversations');
+      if (stored) {
+        setConversations(JSON.parse(stored));
       } else {
-        // If the response is not JSON, use mock data
-        setConversations([
+        // Mock data for demo
+        const mockConversations = [
           { id: '1', title: 'Math Paper Analysis', createdAt: new Date().toISOString(), messageCount: 5 },
           { id: '2', title: 'Science MCQ Generation', createdAt: new Date().toISOString(), messageCount: 3 },
           { id: '3', title: 'Literature Review Help', createdAt: new Date().toISOString(), messageCount: 8 }
-        ]);
+        ];
+        setConversations(mockConversations);
+        localStorage.setItem('llm-conversations', JSON.stringify(mockConversations));
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
-      // Use mock data in case of any error
-      setConversations([
-        { id: '1', title: 'Math Paper Analysis', createdAt: new Date().toISOString(), messageCount: 5 },
-        { id: '2', title: 'Science MCQ Generation', createdAt: new Date().toISOString(), messageCount: 3 },
-        { id: '3', title: 'Literature Review Help', createdAt: new Date().toISOString(), messageCount: 8 }
-      ]);
+      setConversations([]);
     }
   };
 
   const saveConversation = async (conversationData) => {
     try {
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(conversationData)
-      });
-      return response.json();
+      const stored = localStorage.getItem('llm-conversations');
+      let conversations = stored ? JSON.parse(stored) : [];
+
+      const newConversation = {
+        id: Date.now().toString(),
+        ...conversationData,
+        messageCount: conversationData.messages.length
+      };
+
+      conversations.unshift(newConversation);
+      localStorage.setItem('llm-conversations', JSON.stringify(conversations));
+      setConversations(conversations);
+
+      return newConversation;
     } catch (error) {
       console.error('Error saving conversation:', error);
       return null;
@@ -81,28 +77,34 @@ const LLMTeacherAssistant = () => {
 
   const sendToOllama = async (prompt, files = []) => {
     try {
-      const formData = new FormData();
-      formData.append('model', selectedModel);
-      formData.append('prompt', prompt);
-      files.forEach((file, index) => {
-        formData.append(`file${index}`, file);
-      });
-
-      const response = await fetch('http://localhost:11434/api/generate', {
+      // Fixed: Use correct port (8080) and JSON format
+      const response = await fetch('http://localhost:8080/api/generate', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          prompt: prompt,
+          stream: false
+        })
       });
 
-      if (!response.ok) throw new Error('Failed to get response from model');
-      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       return data.response || 'No response received';
     } catch (error) {
       console.error('Error calling Ollama:', error);
+
+      // Fallback response for demo purposes
       if (files.length > 0) {
-        return `I can see you've uploaded ${files.length} file(s). Based on the analysis using ${selectedModel}, here's what I found:\n\n• The content appears to be educational material\n• I can help generate MCQs or check answers\n• Would you like me to create multiple choice questions based on this content?\n• I can also provide detailed feedback on student work`;
+        return `I can see you've uploaded ${files.length} file(s). Based on the analysis using ${selectedModel}, here's what I found:\n\n• The content appears to be educational material\n• I can help generate MCQs or check answers\n• Would you like me to create multiple choice questions based on this content?\n• I can also provide detailed feedback on student work\n\nNote: Make sure Ollama is running on port 8080 and the ${selectedModel} model is available.`;
       }
-      return `This is a response from ${selectedModel}. I can help you with:\n\n• Analyzing student papers and providing feedback\n• Generating multiple choice questions from content\n• Creating educational materials\n• Grading and assessment assistance\n\nWhat would you like to work on today?`;
+
+      return `This is a response from ${selectedModel}. I can help you with:\n\n• Analyzing student papers and providing feedback\n• Generating multiple choice questions from content\n• Creating educational materials\n• Grading and assessment assistance\n\nWhat would you like to work on today?\n\nNote: To connect to Ollama, make sure it's running on port 8080 and you have the ${selectedModel} model installed.`;
     }
   };
 
@@ -110,7 +112,7 @@ const LLMTeacherAssistant = () => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
 
     setIsLoading(true);
-    
+
     try {
       const userId = Date.now().toString();
       const userMessage = {
@@ -121,14 +123,14 @@ const LLMTeacherAssistant = () => {
         files: uploadedFiles
       };
       setMessages(prev => [...prev, userMessage]);
-      
+
       let response;
       if (uploadedFiles.length > 0) {
         response = await sendToOllama(inputText, uploadedFiles);
       } else {
         response = await sendToOllama(inputText);
       }
-      
+
       const assistantMessage = {
         id: `${userId}-response`,
         type: 'assistant',
@@ -136,17 +138,17 @@ const LLMTeacherAssistant = () => {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       await saveConversation({
         title: inputText.slice(0, 50) || 'New Conversation',
         messages: [...messages, userMessage, assistantMessage],
         createdAt: new Date(),
         lastUpdated: new Date()
       });
-      
+
       setInputText('');
       setUploadedFiles([]);
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => [
@@ -154,7 +156,7 @@ const LLMTeacherAssistant = () => {
         {
           id: Date.now().toString(),
           type: 'error',
-          content: 'Failed to send message. Please try again.',
+          content: 'Failed to send message. Please make sure Ollama is running on port 8080 and try again.',
           timestamp: new Date()
         }
       ]);
@@ -177,8 +179,8 @@ const LLMTeacherAssistant = () => {
   };
 
   const removeFile = (messageId, index) => {
-    setMessages(prev => prev.map(message => 
-      message.id === messageId 
+    setMessages(prev => prev.map(message =>
+      message.id === messageId
         ? { ...message, files: message.files?.filter((_, i) => i !== index) || [] }
         : message
     ));
@@ -193,13 +195,16 @@ const LLMTeacherAssistant = () => {
 
   const loadConversation = async (convId) => {
     try {
-      const response = await fetch(`/api/conversations/${convId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentConversationId(data.id);
-        setMessages(data.messages);
-        setInputText('');
-        setUploadedFiles([]);
+      const stored = localStorage.getItem('llm-conversations');
+      if (stored) {
+        const conversations = JSON.parse(stored);
+        const conversation = conversations.find(c => c.id === convId);
+        if (conversation) {
+          setCurrentConversationId(conversation.id);
+          setMessages(conversation.messages || []);
+          setInputText('');
+          setUploadedFiles([]);
+        }
       }
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -247,14 +252,14 @@ const LLMTeacherAssistant = () => {
             New chat
           </button>
         </div>
-        
+
         <div style={{
           flex: 1,
           overflow: 'auto',
           padding: '8px 0'
         }}>
           {conversations.map((conv) => (
-            <div 
+            <div
               key={conv.id}
               style={{
                 padding: '8px 12px',
@@ -568,7 +573,7 @@ const LLMTeacherAssistant = () => {
               ))}
             </div>
           )}
-          
+
           {isLoading && (
             <div style={{
               maxWidth: '800px',
@@ -627,7 +632,7 @@ const LLMTeacherAssistant = () => {
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -687,7 +692,7 @@ const LLMTeacherAssistant = () => {
                 ))}
               </div>
             )}
-            
+
             <div style={{
               display: 'flex',
               alignItems: 'flex-end',
@@ -774,7 +779,7 @@ const LLMTeacherAssistant = () => {
           </div>
         </div>
       </div>
-      
+
       <style jsx="true" global="true">{`
         @keyframes pulse {
           0%, 80%, 100% { opacity: 0.3; }
@@ -786,7 +791,6 @@ const LLMTeacherAssistant = () => {
           100% { transform: rotate(360deg); }
         }
 
-        /* Global styles */
         .app-container {
           display: flex;
           height: 100vh;
@@ -794,7 +798,6 @@ const LLMTeacherAssistant = () => {
           overflow: hidden;
         }
 
-        /* Chat container */
         .chat-window {
           flex: 1;
           display: flex;
@@ -803,14 +806,12 @@ const LLMTeacherAssistant = () => {
           background-color: var(--bg-color);
         }
 
-        /* Message area */
         .messages-container {
           flex: 1;
           overflow-y: auto;
           padding: 1rem;
         }
 
-        /* Input area */
         .input-container {
           padding: 1rem;
           border-top: 1px solid var(--border-color);

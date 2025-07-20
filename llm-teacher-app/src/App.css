@@ -43,24 +43,24 @@
   background-color: #f8f9fa;
 }
 
-.conversation-list {
+.chat-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.conversation-item {
+.chat-item {
   padding: 1rem;
   border-bottom: 1px solid #dee2e6;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
-.conversation-item:hover {
+.chat-item:hover {
   background-color: #f8f9fa;
 }
 
-.conversation-item.active {
+.chat-item.active {
   background-color: #e9ecef;
 }
 
